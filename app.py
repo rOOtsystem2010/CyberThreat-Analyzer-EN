@@ -110,10 +110,13 @@ ANALYSIS_SCHEMA = types.Schema(
                             "Organization": types.Schema(type=types.Type.STRING),
                             "Country": types.Schema(type=types.Type.STRING),
                             "Role": types.Schema(type=types.Type.STRING),
-                            "Status": types.Schema(type=types.Type.STRING) # Live or Dead
+                            "Status": types.Schema(
+                                type=types.Type.STRING, 
+                                description="Live or Dead for Public IP. MUST use 'N/A' or 'Private' for local/internal network ranges (e.g., 192.168.x.x, 10.x.x.x)."
+                            ) 
                         }
                     ),
-                    description="List of IP addresses, their context, and live/dead status."
+                    description="List of IP addresses, their context, and live/dead status. Private IPs MUST be classified as N/A or Private."
                 ),
                 "rca_analysis": types.Schema(
                     type=types.Type.ARRAY,
@@ -196,7 +199,8 @@ SYSTEM_INSTRUCTION = (
     "ALL OUTPUT MUST BE STRICTLY in the ENGLISH language. "
     "Your response MUST be a single JSON object that conforms precisely to the provided JSON schema. "
     "Do not include any markdown formatting (e.g., ```json) or explanatory text outside of the JSON object. "
-    "Ensure all analysis (narrative, findings, tables) is insightful and accurate."
+    "Ensure all analysis (narrative, findings, tables) is insightful and accurate. "
+    "For IP intelligence, strictly follow the rule: Private IP addresses (10.x.x.x, 192.168.x.x, 172.16.x.x to 172.31.x.x) MUST have 'N/A' or 'Private' status."
 )
 
 @app.route('/')
