@@ -1,0 +1,5 @@
+Flask
+google-genai
+gunicorn
+Flask-Compress
+flask

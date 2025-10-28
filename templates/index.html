@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberThreat Analyzer v1.0.3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        /* No specific Arabic font needed for English */
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #c9d1d9; /* Light text */
+            direction: ltr; /* Left-to-right */
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .header-card {
+            background-color: #161b22;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .card {
+            background-color: #161b22;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.5);
+            border: 1px solid #30363d;
+        }
+        .critical-bg { background-color: #e53e3e; } /* Dark Red */
+        .high-bg { background-color: #dd6b20; } /* Orange */
+        .medium-bg { background-color: #d69e2e; } /* Yellow */
+        .low-bg { background-color: #38a169; } /* Green */
+
+        /* Analyze button customization */
+        .analyze-button {
+            background-color: #238636; /* GitHub Green */
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        .analyze-button:hover {
+            background-color: #2ea043;
+        }
+        .analyze-button:active {
+            transform: scale(0.98);
+        }
+        /* Tab button customization */
+        .tab-button {
+            transition: background-color 0.2s, color 0.2s;
+            border: 1px solid transparent;
+        }
+        .tab-button.active {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+        /* Vis.js Timeline styling */
+        .vis-timeline {
+            border: 1px solid #30363d !important;
+            background-color: #0d1117 !important;
+            color: #c9d1d9 !important;
+            border-radius: 0.5rem;
+        }
+        .vis-item {
+            background-color: #21262d !important;
+            border-color: #58a6ff !important;
+            color: #c9d1d9 !important;
+            box-shadow: 0 0 5px rgba(88, 166, 255, 0.5);
+        }
+        .vis-item.vis-selected {
+            border-color: #f78166 !important;
+            background-color: #30363d !important;
+        }
+        .vis-label {
+            color: #8b949e !important;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="container mx-auto">
+        
+        <header class="text-center mb-10 header-card p-6 rounded-xl">
+            <h1 class="text-4xl font-bold text-blue-400">CyberThreat Analyzer v1.0.3</h1>
+            <p class="text-xl text-gray-400 mt-2">Digital Forensics Threat Analysis Platform: AI & Automation at Your Service</p>
+        </header>
+
+        <div class="card p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-300">Input Point: Upload Log / Configuration Data</h2>
+            <form id="upload-form" class="space-y-4">
+                <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <input type="file" id="file-input" name="file" class="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-indigo-50 file:text-indigo-700
+                        hover:file:bg-indigo-100 cursor-pointer
+                    ">
+                    <button type="submit" id="analyze-btn" class="analyze-button w-full sm:w-auto px-6 py-2 text-white font-bold rounded-full flex items-center justify-center" disabled>
+                        <i class="fas fa-microscope mr-2"></i>
+                        <span id="btn-text">Start Deep Analysis</span>
+                        <div id="loading-spinner" class="spinner ml-2 hidden">
+                            <i class="fas fa-sync-alt fa-spin"></i>
+                        </div>
+                    </button>
+                </div>
+            </form>
+
+            <div id="status-message" class="mt-4 p-3 rounded-lg text-center font-medium hidden" role="alert"></div>
+        </div>
+
+        <div id="analysis-results" class="space-y-8 hidden">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <div class="card p-6 lg:col-span-1">
+                    <h3 class="text-xl font-bold mb-4 text-center text-red-400">Risk Summary</h3>
+                    <div id="risk-summary" class="text-center p-6 rounded-lg">
+                        <p class="text-6xl font-extrabold text-white" id="risk-score">--</p>
+                        <p class="text-2xl mt-3 font-semibold text-white" id="risk-level">Undetermined</p>
+                    </div>
+                </div>
+
+                <div class="card p-6 lg:col-span-2">
+                    <h3 class="text-xl font-bold mb-4 text-blue-300">Attack Narrative (AI Narrative)</h3>
+                    <p id="attack-summary" class="text-gray-300 mb-4"></p>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="p-3 bg-[#21262d] rounded-md">
+                            <p class="font-bold text-gray-400">Probable Attack Origin</p>
+                            <p id="attack-origin-country" class="text-white"></p>
+                        </div>
+                        <div class="p-3 bg-[#21262d] rounded-md">
+                            <p class="font-bold text-gray-400">Attacker Intent</p>
+                            <p id="attacker-intent" class="text-white"></p>
+                        </div>
+                        <div class="col-span-2 p-3 bg-[#21262d] rounded-md">
+                            <p class="font-bold text-gray-400">Detected Stages</p>
+                            <p id="attack-stages" class="text-white text-sm"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-6">
+                
+                <div class="flex overflow-x-auto border-b border-[#30363d] mb-4">
+                    <button id="tab-detailed" class="tab-button active px-4 py-2 text-sm font-medium rounded-t-lg">Detailed Findings & Matrices</button>
+                    <button id="tab-ip" class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg">IP Intelligence & Status</button>
+                    <button id="tab-rca" class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg">Root Cause Analysis (RCA)</button>
+                    <button id="tab-yara" class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg">YARA Rule Simulation</button>
+                    <button id="tab-timeline" class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg">Interactive Timeline</button>
+                    <button id="tab-recommendations" class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg">Recommendations & Countermeasures</button>
+                </div>
+
+                <div id="tab-content">
+                    
+                    <div id="content-detailed" class="tab-content">
+                        <h4 class="text-xl font-bold mb-4 text-orange-400">Detailed Findings</h4>
+                        <div id="detailed-findings-container" class="space-y-6">
+                            </div>
+                    </div>
+
+                    <div id="content-ip" class="tab-content hidden">
+                        <h4 class="text-xl font-bold mb-4 text-green-400">IP Intelligence & Status</h4>
+                        <p class="text-sm text-gray-400 mb-4">Data related to IP addresses found in the log and their associated threat intelligence.</p>
+                        <div id="ip-intelligence-table">
+                            </div>
+                    </div>
+
+                    <div id="content-rca" class="tab-content hidden">
+                        <h4 class="text-xl font-bold mb-4 text-purple-400">Root Cause Analysis (RCA)</h4>
+                        <p class="text-sm text-gray-400 mb-4">Detailed analysis of the root causes of the incident and direct recommendations.</p>
+                        <div id="rca-analysis-table">
+                            </div>
+                    </div>
+
+                    <div id="content-yara" class="tab-content hidden">
+                        <h4 class="text-xl font-bold mb-4 text-yellow-400">YARA Rule Simulation</h4>
+                        <p class="text-sm text-gray-400 mb-4">Simulation of YARA rule scans that potentially match indicators in the log.</p>
+                        <div id="yara-analysis-table">
+                            </div>
+                    </div>
+
+                    <div id="content-timeline" class="tab-content hidden">
+                        <h4 class="text-xl font-bold mb-4 text-cyan-400">Interactive Timeline</h4>
+                        <p class="text-sm text-gray-400 mb-4">Interactive visual representation of the sequence of security events.</p>
+                        <div id="timeline-visualization" style="height: 300px; width: 100%;">
+                            </div>
+                    </div>
+
+                    <div id="content-recommendations" class="tab-content hidden">
+                        <h4 class="text-xl font-bold mb-4 text-pink-400">Recommendations & Countermeasures</h4>
+                        <ul id="recommendations-list" class="list-disc pl-6 space-y-2 text-gray-300">
+                            </ul>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="text-center text-sm text-gray-500 mt-4">
+                <p id="analysis-time-meta"></p>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const btnText = document.getElementById('btn-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const statusMessage = document.getElementById('status-message');
+        const resultsDiv = document.getElementById('analysis-results');
+
+        // Risk Summary elements
+        const riskSummaryDiv = document.getElementById('risk-summary');
+        const riskScoreP = document.getElementById('risk-score');
+        const riskLevelP = document.getElementById('risk-level');
+        
+        // Attack Narrative elements
+        const attackSummaryP = document.getElementById('attack-summary');
+        const attackOriginCountryP = document.getElementById('attack-origin-country');
+        const attackerIntentP = document.getElementById('attacker-intent');
+        const attackStagesP = document.getElementById('attack-stages');
+
+        // Table containers
+        const detailedFindingsContainer = document.getElementById('detailed-findings-container');
+        const ipIntelligenceTableDiv = document.getElementById('ip-intelligence-table');
+        const rcaAnalysisTableDiv = document.getElementById('rca-analysis-table');
+        const yaraAnalysisTableDiv = document.getElementById('yara-analysis-table');
+        const recommendationsList = document.getElementById('recommendations-list');
+        const analysisTimeMetaP = document.getElementById('analysis-time-meta');
+
+        // Timeline
+        const timelineVisualizationDiv = document.getElementById('timeline-visualization');
+        let timeline = null; 
+
+        // ------------------------------------------
+        // General Helper Functions
+        // ------------------------------------------
+
+        /**
+         * Displays a status message (error or success) on the interface.
+         * @param {string} message - The message text.
+         * @param {string} type - The message type ('success', 'error', or 'info').
+         */
+        function displayStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.classList.remove('hidden', 'bg-red-800', 'bg-green-800', 'bg-blue-800', 'text-white');
+            
+            if (type === 'error') {
+                statusMessage.classList.add('bg-red-800', 'text-white');
+            } else if (type === 'success') {
+                statusMessage.classList.add('bg-green-800', 'text-white');
+            } else {
+                statusMessage.classList.add('bg-blue-800', 'text-white');
+            }
+        }
+
+        /**
+         * Updates the state of the analysis button (enabled/disabled + loading).
+         * @param {boolean} isLoading - Whether the process is loading.
+         */
+        function updateButtonState(isLoading) {
+            if (isLoading) {
+                analyzeBtn.disabled = true;
+                loadingSpinner.classList.remove('hidden');
+                btnText.textContent = 'Analyzing...';
+            } else {
+                analyzeBtn.disabled = fileInput.files.length === 0;
+                loadingSpinner.classList.add('hidden');
+                btnText.textContent = 'Start Deep Analysis';
+            }
+        }
+
+        // ------------------------------------------
+        // UI Building Functions
+        // ------------------------------------------
+        
+        /**
+         * Creates the status icon (Live or Dead) for the IP table.
+         * @param {string} status - IP status ('Live', 'Dead', 'N/A').
+         * @returns {string} - HTML code for the icon.
+         */
+        function renderStatusIcon(status) {
+            const normalizedStatus = status.toLowerCase().trim();
+            if (normalizedStatus === 'live') {
+                return '<i class="fas fa-circle text-green-500 text-xs mr-1"></i> Live';
+            } else if (normalizedStatus === 'dead') {
+                return '<i class="fas fa-circle text-red-500 text-xs mr-1"></i> Dead';
+            }
+            return status; // Return text as is for N/A or other status
+        }
+
+        /**
+         * Creates an HTML table from a data array.
+         * @param {Array<Object>} data - Array of data objects.
+         * @param {Array<string>} headers - Table headers in order.
+         * @returns {string} - HTML code for the table.
+         */
+        function createTableHTML(data, headers, isIpTable = false) {
+            if (!data || data.length === 0) {
+                return '<p class="text-gray-500">No data available for this table in the analysis.</p>';
+            }
+
+            let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-[#30363d] rounded-lg">';
+            
+            // Table Headers
+            html += '<thead class="bg-[#21262d]">';
+            html += '<tr>';
+            headers.forEach(header => {
+                html += `<th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">${header}</th>`;
+            });
+            html += '</tr>';
+            html += '</thead>';
+
+            // Table Body
+            html += '<tbody class="divide-y divide-[#30363d]">';
+            data.forEach((row, index) => {
+                const bgColor = index % 2 === 0 ? 'bg-[#161b22]' : 'bg-[#1e2329]'; // Alternating shade
+                html += `<tr class="${bgColor}">`;
+                headers.forEach(headerKey => {
+                    let cellContent = row[headerKey] || '';
+                    
+                    // Apply status icon for IP table
+                    if (isIpTable && headerKey === 'Status') {
+                        cellContent = renderStatusIcon(cellContent);
+                    }
+
+                    html += `<td class="px-4 py-4 whitespace-normal text-sm text-gray-300">${cellContent}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            html += '</table></div>';
+            return html;
+        }
+
+        /**
+         * Renders the detailed findings section (Critical, High, Medium, Low).
+         * @param {Object} detailedFindings - The detailed findings.
+         */
+        function renderDetailedFindings(detailedFindings) {
+            detailedFindingsContainer.innerHTML = ''; // Clear container
+            
+            const severityOrder = ['critical', 'high', 'medium', 'low'];
+            const severityMap = {
+                critical: { title: 'Critical Findings', color: 'critical-bg', icon: 'fas fa-skull-crossbones' },
+                high: { title: 'High Severity Findings', color: 'high-bg', icon: 'fas fa-exclamation-triangle' },
+                medium: { title: 'Medium Severity Findings', color: 'medium-bg', icon: 'fas fa-bell' },
+                low: { title: 'Low Severity Findings', color: 'low-bg', icon: 'fas fa-info-circle' }
+            };
+
+            severityOrder.forEach(key => {
+                const findings = detailedFindings[key];
+                if (findings && Array.isArray(findings) && findings.length > 0) {
+                    const meta = severityMap[key];
+                    let html = `
+                        <div class="border-2 rounded-lg p-4" style="border-color: ${meta.color.split('-')[0] === 'critical' ? '#e53e3e' : meta.color.split('-')[0] === 'high' ? '#dd6b20' : meta.color.split('-')[0] === 'medium' ? '#d69e2e' : '#38a169'}">
+                            <h5 class="text-lg font-bold mb-3 flex items-center ${meta.color.split('-')[0] === 'critical' ? 'text-red-400' : meta.color.split('-')[0] === 'high' ? 'text-orange-400' : meta.color.split('-')[0] === 'medium' ? 'text-yellow-400' : 'text-green-400'}">
+                                <i class="${meta.icon} mr-2"></i> ${meta.title} (${findings.length})
+                            </h5>
+                            <div class="space-y-4">
+                    `;
+                    findings.forEach(finding => {
+                        html += `
+                            <div class="p-3 bg-[#21262d] rounded-md border-l-4" style="border-color: ${meta.color.split('-')[0] === 'critical' ? '#e53e3e' : meta.color.split('-')[0] === 'high' ? '#dd6b20' : meta.color.split('-')[0] === 'medium' ? '#d69e2e' : '#38a169'}">
+                                <p class="font-semibold text-white mb-1"><i class="fas fa-bug mr-1 text-sm"></i> Finding: ${finding["Finding"]}</p>
+                                <p class="text-gray-400 text-sm"><i class="fas fa-shield-alt mr-1 text-sm"></i> Recommendation: ${finding["Recommendation"]}</p>
+                            </div>
+                        `;
+                    });
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                    detailedFindingsContainer.innerHTML += html;
+                }
+            });
+
+            if (detailedFindingsContainer.innerHTML === '') {
+                detailedFindingsContainer.innerHTML = '<p class="text-gray-500">No detailed findings requiring severity classification were found.</p>';
+            }
+        }
+        
+        /**
+         * Initializes and renders the interactive timeline.
+         * @param {Object} timelineData - Timeline data.
+         */
+        function renderTimeline(timelineData) {
+            // Clear any previous timeline
+            if (timeline) {
+                timeline.destroy();
+            }
+
+            if (!timelineData || !Array.isArray(timelineData.items) || timelineData.items.length === 0) {
+                timelineVisualizationDiv.innerHTML = '<p class="text-gray-500 p-4">No interactive timeline data available for this analysis.</p>';
+                return;
+            }
+
+            // Transform data for Vis.js
+            const items = new vis.DataSet(timelineData.items.map(item => ({
+                id: item.id,
+                content: item.content,
+                start: item.start,
+                group: item.group,
+                type: item.type || 'point', 
+                style: item.style || 'background-color: #58a6ff; border-color: #58a6ff;'
+            })));
+
+            const groups = new vis.DataSet(timelineData.groups.map(group => ({
+                id: group.id,
+                content: group.content
+            })));
+
+            const options = {
+                template: function (item) {
+                    return `<div class="p-1">${item.content}</div>`;
+                },
+                orientation: 'top',
+                autoResize: true,
+                editable: false,
+                stack: true,
+                zoomMax: 315360000000, 
+                zoomMin: 1000, 
+                locale: 'en', // Set locale to English
+                multiselect: true,
+                clickToUse: true,
+                start: items.min('start') ? new Date(items.min('start').start).getTime() - 86400000 : new Date().getTime() - 86400000,
+                end: items.max('start') ? new Date(items.max('start').start).getTime() + 86400000 : new Date().getTime() + 86400000,
+            };
+
+            timeline = new vis.Timeline(timelineVisualizationDiv, items, groups, options);
+            
+            // Ensure timeline is responsive
+            if (window.timelineResizeListener) {
+                window.removeEventListener('resize', window.timelineResizeListener);
+            }
+            window.timelineResizeListener = () => {
+                if (timeline) timeline.fit();
+            };
+            window.addEventListener('resize', window.timelineResizeListener);
+        }
+
+        // ------------------------------------------
+        // Analysis Results Handler
+        // ------------------------------------------
+
+        /**
+         * Injects analysis data into the interface.
+         * @param {Object} data - JSON object from the API response.
+         */
+        function displayAnalysis(data) {
+            resultsDiv.classList.remove('hidden');
+
+            // 1. Risk Summary
+            const risk = data.risk_assessment;
+            riskScoreP.textContent = risk.score || 'N/A';
+            riskLevelP.textContent = risk.level || 'Undetermined';
+            
+            riskSummaryDiv.className = 'text-center p-6 rounded-lg'; 
+            const colorClass = risk.color_class ? risk.color_class.toLowerCase() : 'low';
+            riskSummaryDiv.classList.add(`${colorClass}-bg`);
+
+            // 2. Attack Narrative
+            const narrative = data.attack_narrative;
+            attackSummaryP.textContent = narrative.summary || 'No narrative available.';
+            attackOriginCountryP.textContent = narrative.attack_origin_country || 'Undetermined';
+            attackerIntentP.textContent = narrative.attacker_intent || 'Undetermined';
+            attackStagesP.textContent = (narrative.stages_found && narrative.stages_found.length > 0) ? narrative.stages_found.join(' 🛡️ ') : 'No clear attack stages detected.';
+            
+            // 3. Tables
+            const tables = data.tables;
+            
+            // 3.1. IP Intelligence 
+            if (tables.ip_intelligence) {
+                // IMPORTANT: Headers must match the JSON keys from app.py
+                const ipHeaders = ["IP Address", "Organization", "Country", "Role", "Status"];
+                ipIntelligenceTableDiv.innerHTML = createTableHTML(tables.ip_intelligence, ipHeaders, true); 
+            } else {
+                 ipIntelligenceTableDiv.innerHTML = '<p class="text-gray-500">No data available for this table in the analysis.</p>';
+            }
+
+            // 3.2. Root Cause Analysis (RCA)
+            if (tables.rca_analysis) {
+                // IMPORTANT: Headers must match the JSON keys from app.py
+                const rcaHeaders = ["Analysis Element", "Result/Details", "Recommendation"];
+                rcaAnalysisTableDiv.innerHTML = createTableHTML(tables.rca_analysis, rcaHeaders);
+            } else {
+                 rcaAnalysisTableDiv.innerHTML = '<p class="text-gray-500">No data available for this table in the analysis.</p>';
+            }
+
+            // 3.3. YARA Simulation
+            if (tables.yara_analysis) {
+                // IMPORTANT: Headers must match the JSON keys from app.py
+                const yaraHeaders = ["Matching Rule", "Severity", "Result"];
+                yaraAnalysisTableDiv.innerHTML = createTableHTML(tables.yara_analysis, yaraHeaders);
+            } else {
+                 yaraAnalysisTableDiv.innerHTML = '<p class="text-gray-500">No data available for this table in the analysis.</p>';
+            }
+            
+            // 4. Detailed Findings
+            if (data.detailed_findings) {
+                renderDetailedFindings(data.detailed_findings);
+            } else {
+                detailedFindingsContainer.innerHTML = '<p class="text-gray-500">No detailed findings requiring severity classification were found.</p>';
+            }
+
+            // 5. Recommendations
+            recommendationsList.innerHTML = '';
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(rec => {
+                    const li = document.createElement('li');
+                    li.textContent = rec;
+                    recommendationsList.appendChild(li);
+                });
+            } else {
+                recommendationsList.innerHTML = '<p class="text-gray-500">No specific recommendations in this analysis.</p>';
+            }
+
+            // 6. Interactive Timeline
+            if (data.interactive_timeline) {
+                renderTimeline(data.interactive_timeline);
+            } else {
+                timelineVisualizationDiv.innerHTML = '<p class="text-gray-500 p-4">No interactive timeline data available for this analysis.</p>';
+            }
+
+            // 7. Metadata
+            analysisTimeMetaP.textContent = `Analysis completed at: ${data.analysis_metadata.analysis_time || 'Undetermined time'}`;
+        }
+        
+        // ------------------------------------------
+        // Event Handling
+        // ------------------------------------------
+
+        // Enable analyze button when file is selected
+        fileInput.addEventListener('change', () => {
+            analyzeBtn.disabled = fileInput.files.length === 0;
+            if (fileInput.files.length > 0) {
+                statusMessage.classList.add('hidden');
+            }
+        });
+
+        // Handle form submission (Analysis)
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) {
+                displayStatus('Please select a log file for analysis.', 'info');
+                return;
+            }
+
+            updateButtonState(true);
+            resultsDiv.classList.add('hidden'); 
+            statusMessage.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.success === false) {
+                        displayStatus(data.error || 'An unknown error occurred during processing.', 'error');
+                    } else {
+                        // Analysis Success
+                        displayStatus('✅ Analysis completed successfully! Results are displayed below.', 'success');
+                        displayAnalysis(data);
+                        // Automatically switch to the Detailed Findings tab
+                        document.getElementById('tab-detailed').click(); 
+                    }
+                } else {
+                    // Server-side error (4xx or 5xx)
+                    displayStatus(`🚫 Server Error (${response.status}): ${data.error || 'Failed to connect to the backend.'}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                displayStatus('❌ Failed to connect to the server. Ensure the backend is running correctly.', 'error');
+            } finally {
+                updateButtonState(false);
+            }
+        });
+
+        // ------------------------------------------
+        // Tab Management
+        // ------------------------------------------
+
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.id.replace('tab-', 'content-');
+
+                // Remove active state from all buttons and hide all content
+                tabButtons.forEach(btn => btn.classList.remove('active', 'bg-[#30363d]', 'border-[#8b949e]'));
+                tabContents.forEach(content => content.classList.add('hidden'));
+
+                // Activate the current button and display the corresponding content
+                button.classList.add('active', 'bg-[#30363d]', 'border-[#8b949e]');
+                document.getElementById(targetId).classList.remove('hidden');
+
+                // Refit the timeline if selected
+                if (targetId === 'content-timeline' && timeline) {
+                    // Small delay to ensure rendering is complete
+                    setTimeout(() => timeline.fit(), 100); 
+                }
+            });
+        });
+
+        // Enable analyze button on page load
+        window.addEventListener('load', () => {
+             analyzeBtn.disabled = fileInput.files.length === 0;
+        });
+
+    </script>
+</body>
+</html>
