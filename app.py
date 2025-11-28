@@ -220,7 +220,7 @@ def analyze_file():
     file_extension = file.filename.rsplit('.', 1)[-1].lower()
     
     # Check for allowed file types
-    if file_extension in ['log', 'txt', 'csv', 'json', 'jsonl', 'conf', 'cfg', 'ini']:
+    if file_extension in ['log', 'txt', 'csv', 'json', 'jsonl', 'conf', 'cfg', 'ini', 'pcapng', 'pcap']:
         try:
             # Read file content safely
             file_content = file.read().decode('utf-8', errors='ignore')
